@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brain → Robot · EEG Brain-Computer Interface</title>
+<style>
+:root{--bg:#070b14;--panel:#0c1322;--card:#0f192b;--line:#1b2840;--txt:#eef2f7;--mut:#8a9bb4;--ok:#22e06a;--bad:#ff4d5e;--amb:#ffb000;--cy:#38d8ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,"Segoe UI",Roboto,sans-serif;font-size:clamp(13px,.6vw + 6px,18px)}
+button{font-family:inherit}
+.page{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100vh}
+
+/* ---------- header: logo | centred title | logo ---------- */
+header{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,3fr) minmax(120px,1fr);align-items:center;gap:20px;padding:12px 28px;border-bottom:1px solid var(--line);background:#0a111e}
+.slot{display:flex;align-items:center;min-height:48px}.slot.r{justify-content:flex-end;gap:10px}
+.slot img{height:48px;width:auto;display:block}
+.ttl{text-align:center;min-width:0}
+.ttl .k{font-size:.68em;letter-spacing:2.4px;text-transform:uppercase;color:var(--mut);font-weight:600}
+.ttl h1{margin:4px 0 0;font-size:1.35em;line-height:1.2;font-weight:700;text-wrap:balance}
+.ghost{background:transparent;color:var(--mut);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:.8em}
+.ghost:hover{color:#fff;border-color:#3a4c6b}
+
+/* ---------- main ---------- */
+.main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(380px,1fr);min-height:0}
+#stage{position:relative;min-height:0;background:#0a0f1a}#stage canvas{display:block;width:100%;height:100%}
+.lab{font-size:.68em;letter-spacing:1.6px;text-transform:uppercase;color:var(--mut);font-weight:600}
+.robotstate{position:absolute;left:28px;top:22px;pointer-events:none}
+.chip{font-size:1.55em;font-weight:700;margin-top:4px;letter-spacing:.1px}
+.chip.bad{color:#ffb3bb}
+.hint{position:absolute;right:24px;top:24px;color:#5f6f89;font-size:.74em;pointer-events:none}
+.ctl{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px}
+.primary{background:var(--cy);color:#04121c;border:0;border-radius:14px;padding:15px 34px;font-size:1.15em;font-weight:800;cursor:pointer;box-shadow:0 8px 28px #38d8ff33;transition:transform .12s}
+.primary:hover{transform:translateY(-1px)}.primary:active{transform:translateY(1px)}
+.sec{background:#0a111ecc;color:var(--mut);border:1px solid var(--line);border-radius:14px;padding:14px 18px;font-size:.95em;cursor:pointer;backdrop-filter:blur(6px)}
+.sec.on{color:var(--ok);border-color:#22e06a66}
+.keys{position:absolute;left:28px;bottom:32px;color:#5f6f89;font-size:.72em;pointer-events:none}
+.sws{position:absolute;right:22px;bottom:30px;display:flex;align-items:center;gap:8px}
+.sws span{color:#5f6f89;font-size:.72em}.sw{width:18px;height:18px;border-radius:50%;border:2px solid #333;cursor:pointer;padding:0}.sw.on{outline:2px solid var(--cy);outline-offset:2px}
+
+/* ---------- side panel ---------- */
+.side{background:var(--panel);border-left:1px solid var(--line);padding:18px 20px;display:flex;flex-direction:column;gap:16px;overflow:auto;min-height:0}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:#0a111e;border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.utab{background:transparent;color:var(--mut);border:0;border-radius:9px;padding:9px 6px;cursor:pointer;font-size:.95em;line-height:1.25}
+.utab small{display:block;font-size:.76em;opacity:.75}.utab.on{background:#16263f;color:#fff}
+section{display:flex;flex-direction:column;gap:8px}
+section>.lab{display:flex;justify-content:space-between;align-items:baseline}
+section>.lab em{font-style:normal;text-transform:none;letter-spacing:0;color:#5f6f89;font-size:1.05em}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+#wave{width:100%;height:clamp(96px,15vh,170px);display:block}
+.row{display:flex;align-items:center;gap:10px;margin:7px 0}.row .n{width:6.2em}
+.track{flex:1;height:.9em;background:#070b14;border-radius:99px;overflow:hidden}
+.fill{height:100%;width:0;border-radius:99px;transition:width .6s ease}.pct{width:3em;text-align:right;font-variant-numeric:tabular-nums;color:var(--mut)}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.res span{font-size:.68em;color:var(--mut);letter-spacing:1.4px;text-transform:uppercase}.res b{display:block;font-size:1.4em;margin-top:2px}
+.badge{margin-top:10px;text-align:center;padding:9px;border-radius:10px;background:#16203a;color:var(--amb);font-weight:700}
+.badge.ok{background:#0b2a19;color:var(--ok)}.badge.bad{background:#2d1015;color:#ffb3bb}
+.stats{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.big{font-size:2em;font-weight:800;line-height:1.05}.small{font-size:.76em;color:var(--mut);line-height:1.5;margin-top:4px}
+#why{display:none;font-size:.82em;color:#c9d5e6;line-height:1.55;background:#1a1405;border:1px solid #ffb00044;border-radius:12px;padding:11px 14px}
+#why.show{display:block}
+footer{padding:8px 28px;border-top:1px solid var(--line);background:#09101c;font-size:.72em;color:#5f6f89;text-align:center}
+
+/* ---------- overlay ---------- */
+#overlay{position:fixed;inset:0;background:#030610ee;display:none;align-items:center;justify-content:center;z-index:9;padding:24px;backdrop-filter:blur(8px)}
+#overlay.show{display:flex}.sheet{max-width:1050px;width:100%;background:#0e1524;border:1px solid var(--line);border-radius:20px;padding:28px 32px;max-height:94vh;overflow:auto}
+.sheet h2{margin:0 0 4px;font-size:1.6em}.sheet .sub{color:var(--mut);margin-bottom:20px}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.how div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.how b{display:block;margin-bottom:8px;font-size:1.05em}.how p{margin:0;color:#c3cfe0;line-height:1.55;font-size:.95em}
+.real{margin-top:14px;border:1px solid #ffb00055;background:#2a1e05;border-radius:14px;padding:14px 16px;color:#ffe3a3;line-height:1.55;font-size:.95em}
+.next{margin-top:14px;color:var(--mut);font-size:.9em;line-height:1.6}.next b{color:#dbe4f0}
+.credit{margin-top:10px;color:#5f6f89;font-size:.8em}
+.sheet .primary{margin-top:18px;padding:11px 22px;font-size:1em}
+@media(max-width:900px){.page{height:auto}.main{grid-template-columns:1fr}#stage{height:62vh}.how{grid-template-columns:1fr}header{grid-template-columns:1fr;text-align:center}.slot{justify-content:center}}
+</style></head>
+<body><div class="page">
+<header>
+  <div class="slot"><img src="logo_uaar.png" alt="" onerror="this.remove()"></div>
+  <div class="ttl">
+    <div class="k">Final Year Project 2026 · Open House</div>
+    <h1 id="ptitle">EEG-Based Brain-Computer Interface for Assistive Robotic Arm Control</h1>
+  </div>
+  <div class="slot r"><img src="logo_uiit.png" alt="" onerror="this.remove()"><button class="ghost" id="helpbtn">How it works</button><button class="ghost" id="fsbtn">Full screen</button></div>
+</header>
+
+<div class="main">
+ <div id="stage">
+  <div class="robotstate"><div class="lab">Robot</div><div class="chip" id="action">Waiting for a brain signal…</div></div>
+  <div class="hint">Drag to rotate · scroll to zoom</div>
+  <div class="ctl"><button class="primary" id="next">Next trial ▶</button><button class="sec" id="auto">Auto play</button></div>
+ </div>
+
+ <div class="side">
+  <div class="seg"><button class="utab on" data-u="s1">Subject 1<small>Easy to read</small></button><button class="utab" data-u="s2">Subject 2<small>Hard to read</small></button></div>
+
+  <section><div class="lab">Brain signal <em>real recording, 4 seconds</em></div>
+   <div class="box"><canvas id="wave"></canvas></div></section>
+
+  <section><div class="lab">Decoder output <em id="ms"></em></div>
+   <div class="box">
+    <div class="row"><span class="n">Left hand</span><div class="track"><div class="fill" id="bar0" style="background:#38bdf8"></div></div><span class="pct" id="pct0"></span></div>
+    <div class="row"><span class="n">Right hand</span><div class="track"><div class="fill" id="bar1" style="background:#fbbf24"></div></div><span class="pct" id="pct1"></span></div>
+    <div class="row"><span class="n">Feet</span><div class="track"><div class="fill" id="bar2" style="background:#a78bfa"></div></div><span class="pct" id="pct2"></span></div>
+    <div class="res"><div><span>Person imagined</span><b id="truth">?</b></div><div><span>Decoder says</span><b id="pred">?</b></div></div>
+    <div class="badge" id="badge">…</div>
+   </div></section>
+
+  <section><div class="lab" id="uname">Subject 1</div>
+   <div class="box stats"><div><div class="big" id="fullacc">–</div><div class="small" id="fullacc_n"></div></div>
+    <div style="text-align:right"><div class="big" id="tally" style="font-size:1.4em">0 / 0</div><div class="small">correct so far · <span id="trialno"></span></div></div></div></section>
+
+  <div id="why"><b>Why is this one harder?</b> Brains differ. Roughly 15–30% of people produce signals that are hard to decode, a known research problem called <em>BCI inefficiency</em>. We show it honestly.</div>
+ </div>
+</div>
+
+<footer>Data: BCI Competition IV 2a (TU Graz) · Decoder: EEGNet neural network · 3D model: “Xbot” (Mixamo) · Rendering: three.js</footer>
+</div>
+
+<div id="overlay"><div class="sheet">
+ <h2>How this works</h2><div class="sub">Controlling a robot with thought, in three steps</div>
+ <div class="how">
+  <div><b>1 · A thought becomes a signal</b><p>When you <em>imagine</em> moving your left hand, right hand or feet, without moving, the motor part of your brain changes its electrical activity. Sensors on the scalp (EEG) record it. The wavy lines are a real recording.</p></div>
+  <div><b>2 · The decoder reads the signal</b><p>A trained decoder (a small AI model called EEGNet) looks at 4 seconds from 8 sensors and decides: left hand, right hand or feet. It runs right here in this page, in under a tenth of a second.</p></div>
+  <div><b>3 · The robot obeys</b><p>The robot copies the decision: left arm, right arm or a leg goes up. <span style="color:var(--ok);font-weight:700">Green</span> light means the decoder is right. <span style="color:var(--bad);font-weight:700">Red</span> light means it is wrong.</p></div>
+ </div>
+ <div class="real"><b>Please note, honestly:</b> this is a replay of recorded brain data, not a live headset. The decoder never saw these two people during training; it learned from 8 other people. For Subject 1 it is right about 85% of the time; for Subject 2 about 42%. Random guessing is 33%. Mistakes are shown on purpose: this is how real brain-computer interfaces behave.</div>
+ <div class="next"><b>Keyboard:</b> Space = next trial · 1 / 2 = choose subject · F = full screen · H = this help<br><b>What comes next:</b> Phase 2, a live EEG headset instead of a recording. Phase 3, a physical robotic arm.</div>
+ <div class="credit">Mohammad Usman Ahmad · Areej Sajjad · Supervisor: Prof. Dr. Yaser Hafeez · PMAS-AAUR Rawalpindi</div>
+ <button class="primary" id="closehelp">Got it, start the demo</button>
+</div></div>
+
+<script>
+// show the "why is this harder?" note only while Subject 2 is selected
+(function(){var w=document.getElementById('why');function sync(){var t=document.querySelector('.utab.on');w.classList.toggle('show',!!t&&t.dataset.u==='s2')}
+new MutationObserver(sync).observe(document.querySelector('.seg'),{subtree:true,attributes:true,attributeFilter:['class']});sync()})();
+</script>
+<script src="app.js"></script></body></html>
